@@ -67,6 +67,9 @@ function draw() {
   if (faces.length > 0) {
     let face = faces[0];
     
+    // 1. 繪製面具 (放在耳環之前，讓耳環蓋在上面)
+    drawMask(face, vWidth, vHeight);
+
     // 選取臉頰兩側耳垂點：147 (右), 376 (左)
     let keypoints = [face.keypoints[147], face.keypoints[376]];
 
@@ -122,6 +125,31 @@ function countFingers(hand) {
   }
 
   return count;
+}
+
+// 繪製面具的輔助函數
+function drawMask(face, vWidth, vHeight) {
+  push();
+  // 設定面具顏色：半透明金色
+  fill(255, 215, 0, 150); 
+  stroke(255, 255, 255, 200);
+  strokeWeight(2);
+
+  // 選取面具輪廓的特徵點索引 (橫跨額頭、太陽穴與鼻樑)
+  // 這些索引對應 FaceMesh 的特定臉部位置
+  let maskIndices = [21, 54, 103, 67, 109, 10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 168, 172, 58, 132, 93, 234, 127, 162];
+
+  beginShape();
+  for (let index of maskIndices) {
+    let pt = face.keypoints[index];
+    if (pt) {
+      let mx = map(pt.x, 0, capture.width, 0, vWidth);
+      let my = map(pt.y, 0, capture.height, 0, vHeight);
+      vertex(mx, my);
+    }
+  }
+  endShape(CLOSE);
+  pop();
 }
 
 function windowResized() {
