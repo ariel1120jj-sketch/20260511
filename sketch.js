@@ -1,10 +1,11 @@
 let capture;
 let faceMesh;
 let faces = [];
-let options = { maxFaces: 1, refineLandmarks: false, flipHorizontal: false };
+// 偵測設定
+let options = { maxFaces: 1, refineLandmarks: true, flipHorizontal: false };
 
 function preload() {
-  // 載入 ml5 臉部偵測模型
+  // 載入 FaceMesh 模型
   faceMesh = ml5.faceMesh(options);
 }
 
@@ -12,72 +13,77 @@ function setup() {
   // 建立全螢幕畫布
   createCanvas(windowWidth, windowHeight);
   
-  // 啟動攝影機
+  // 擷取攝影機影像，設定一個穩定的解析度
   capture = createCapture(VIDEO);
-  capture.size(640, 480); // 設定擷取解析度
-  capture.hide();
+  capture.size(640, 480);
+  capture.hide(); // 隱藏預設的 HTML 影片元件
 
   // 開始偵測臉部
   faceMesh.detectStart(capture, gotFaces);
 }
 
 function draw() {
-  // 設定背景色為 e7c6ff
+  // 設定背景顏色為 指定的粉紫色 (#e7c6ff)
   background('#e7c6ff');
 
-  // 動態計算：影像寬高維持為畫布的 50%
+  // 計算顯示影像的尺寸：維持全螢幕寬高各 50%
   let vWidth = windowWidth * 0.5;
   let vHeight = windowHeight * 0.5;
   
-  // 計算置中位置
-  let xPos = (width - vWidth) / 2;
-  let yPos = (height - vHeight) / 2;
+  // 計算置中座標
+  let x = (width - vWidth) / 2;
+  let y = (height - vHeight) / 2;
 
   push();
-  // 1. 先移動到顯示區域的左上角基準點
-  translate(xPos, yPos);
+  // 將原點移動到顯示區域的左上角基準點
+  translate(x, y);
   
-  // 2. 處理左右顛倒（鏡像）：移動到該區域的寬度位置後，水平翻轉
+  // 實作左右顛倒（鏡像）：移動到顯示區域的右側，然後水平翻轉座標系
   translate(vWidth, 0);
   scale(-1, 1);
 
-  // 繪製攝影機影像（現在是鏡像且置中的狀態）
+  // 在翻轉後的座標系中繪製影像，影像本身會呈現鏡像效果
   image(capture, 0, 0, vWidth, vHeight);
 
-  // 3. 繪製耳垂上的黃色圓圈
+  // --- 繪製耳垂上的黃色圓圈 ---
   if (faces.length > 0) {
     let face = faces[0];
     
-    // FaceMesh 耳垂附近的關鍵點索引：
-    // 234 為臉部右側邊緣（鏡像後看起來在左邊）
-    // 454 為臉部左側邊緣（鏡像後看起來在右邊）
-    let leftEarPoint = face.keypoints[234];
-    let rightEarPoint = face.keypoints[454];
+    // 關鍵修正：FaceMesh 特徵點選取
+    // 原始特徵點編號 234 和 454 通常位於臉頰側面的邊緣，不夠穩定。
+    // 這裡我們改用更精確的「耳垂下方」邊緣參考點：
+    // 特徵點編號 147 接近右側耳垂區域
+    // 特徵點編號 376 接近左側耳垂區域
+    let keypoints = [face.keypoints[147], face.keypoints[376]];
 
     fill(255, 255, 0); // 黃色
     noStroke();
 
-    // 關鍵修正：將原始偵測點 (capture 尺寸) 精確對應到目前畫布上的影像尺寸 (vWidth/vHeight)
-    if (leftEarPoint) {
-      let lx = map(leftEarPoint.x, 0, capture.width, 0, vWidth);
-      let ly = map(leftEarPoint.y, 0, capture.height, 0, vHeight);
-      circle(lx, ly, 20); 
-    }
-
-    if (rightEarPoint) {
-      let rx = map(rightEarPoint.x, 0, capture.width, 0, vWidth);
-      let ry = map(rightEarPoint.y, 0, capture.height, 0, vHeight);
-      circle(rx, ry, 20);
+    // 關鍵修正：座標精確映射 (Mapping)
+    // 我們需要將「攝影機原始解析度 (640x480)」的偵測點坐标，
+    // 映射到「畫布上顯示的影像尺寸 (vWidth x vHeight)」上。
+    
+    for (let i = 0; i < keypoints.length; i++) {
+      let pt = keypoints[i];
+      if (pt) {
+        // 使用 map 函數進行座標轉換
+        let mappedX = map(pt.x, 0, capture.width, 0, vWidth);
+        let mappedY = map(pt.y, 0, capture.height, 0, vHeight);
+        
+        // 畫出黃色圓圈（耳環）
+        circle(mappedX, mappedY, 20); 
+      }
     }
   }
   pop();
 }
 
 function gotFaces(results) {
+  // 更新偵測到的臉部數據
   faces = results;
 }
 
 function windowResized() {
-  // 當畫面轉為橫向或縮放時，重新調整畫布尺寸
+  // 當視窗大小改變（如平板轉橫向）時，動態重新調整畫布大小，維持全螢幕
   resizeCanvas(windowWidth, windowHeight);
 }
