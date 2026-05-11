@@ -1,11 +1,13 @@
 let capture;
 let faceMesh;
 let faces = [];
+let earringImg;
 // 偵測設定
 let options = { maxFaces: 1, refineLandmarks: true, flipHorizontal: false };
 
 function preload() {
   // 載入 FaceMesh 模型
+  earringImg = loadImage('pic/acc1_ring.png');
   faceMesh = ml5.faceMesh(options);
 }
 
@@ -45,7 +47,7 @@ function draw() {
   // 在翻轉後的座標系中繪製影像，影像本身會呈現鏡像效果
   image(capture, 0, 0, vWidth, vHeight);
 
-  // --- 繪製耳垂上的黃色圓圈 ---
+  // --- 繪製耳垂上的耳環影像 ---
   if (faces.length > 0) {
     let face = faces[0];
     
@@ -56,13 +58,11 @@ function draw() {
     // 特徵點編號 376 接近左側耳垂區域
     let keypoints = [face.keypoints[147], face.keypoints[376]];
 
-    fill(255, 255, 0); // 黃色
-    noStroke();
-
     // 關鍵修正：座標精確映射 (Mapping)
     // 我們需要將「攝影機原始解析度 (640x480)」的偵測點坐标，
     // 映射到「畫布上顯示的影像尺寸 (vWidth x vHeight)」上。
     
+    imageMode(CENTER); // 設定圖片以中心點定位
     for (let i = 0; i < keypoints.length; i++) {
       let pt = keypoints[i];
       if (pt) {
@@ -70,10 +70,14 @@ function draw() {
         let mappedX = map(pt.x, 0, capture.width, 0, vWidth);
         let mappedY = map(pt.y, 0, capture.height, 0, vHeight);
         
-        // 畫出黃色圓圈（耳環）
-        circle(mappedX, mappedY, 20); 
+        // 計算耳環大小（設為顯示寬度的 8%，讓它隨畫面大小縮放）
+        let eSize = vWidth * 0.08;
+        
+        // 畫出耳環圖片
+        image(earringImg, mappedX, mappedY, eSize, eSize);
       }
     }
+    imageMode(CORNER); // 重設回預設模式，以免影響其他繪圖
   }
   pop();
 }
