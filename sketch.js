@@ -9,6 +9,7 @@ function preload() {
 }
 
 function setup() {
+  // 建立全螢幕畫布
   createCanvas(windowWidth, windowHeight);
   
   // 啟動攝影機
@@ -21,38 +22,49 @@ function setup() {
 }
 
 function draw() {
-  background('#e7c6ff'); // 設定背景色
+  background('#e7c6ff'); // 指定的粉紫色背景
 
+  // 動態計算顯示影像的寬高（全螢幕寬高的一半）
   let vWidth = windowWidth * 0.5;
   let vHeight = windowHeight * 0.5;
+  
+  // 置中座標
   let xPos = (width - vWidth) / 2;
   let yPos = (height - vHeight) / 2;
 
   push();
-  // 移動到置中區域並翻轉鏡像
-  translate(xPos + vWidth, yPos);
-  scale(-1, 1);
+  // --- 處理鏡像與置中 ---
+  translate(xPos + vWidth, yPos); // 移至繪製區域的右側
+  scale(-1, 1);                   // 水平翻轉
 
   // 繪製攝影機影像
   image(capture, 0, 0, vWidth, vHeight);
 
-  // 如果偵測到臉部，畫出耳垂點
+  // --- 繪製耳環 ---
   if (faces.length > 0) {
     let face = faces[0];
     
-    // 取得左右耳垂附近的關鍵點 (234, 454)
-    let keypoints = [face.keypoints[234], face.keypoints[454]];
+    // 取得臉部邊緣特徵點
+    // 234: 右臉頰/耳垂區域 (對應影像左側)
+    // 454: 左臉頰/耳垂區域 (對應影像右側)
+    let leftEarPoint = face.keypoints[234];
+    let rightEarPoint = face.keypoints[454];
 
     fill(255, 255, 0); // 黃色
     noStroke();
 
-    for (let pt of keypoints) {
-      if (pt) {
-        // 將攝影機座標 (640x480) 映射到顯示畫面的大小 (vWidth x vHeight)
-        let mappedX = map(pt.x, 0, capture.width, 0, vWidth);
-        let mappedY = map(pt.y, 0, capture.height, 0, vHeight);
-        circle(mappedX, mappedY, 20); // 畫出黃色圓圈
-      }
+    if (leftEarPoint && rightEarPoint) {
+      // 將攝影機座標 (640x480) 映射到當前畫布上的影像大小 (vWidth x vHeight)
+      let lx = map(leftEarPoint.x, 0, capture.width, 0, vWidth);
+      let ly = map(leftEarPoint.y, 0, capture.height, 0, vHeight);
+      
+      let rx = map(rightEarPoint.x, 0, capture.width, 0, vWidth);
+      let ry = map(rightEarPoint.y, 0, capture.height, 0, vHeight);
+
+      // 微調：耳垂通常在臉頰邊緣點稍微往下、往內一點點
+      // 如果位置太高，可以嘗試在 ly 和 ry 加上一個微小的偏移量，例如 +10
+      circle(lx, ly + 5, 15); 
+      circle(rx, ry + 5, 15);
     }
   }
   pop();
@@ -62,6 +74,7 @@ function gotFaces(results) {
   faces = results;
 }
 
+// 當手機或視窗由直向轉為橫向時，自動重新計算畫布與元件位置
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
 }
