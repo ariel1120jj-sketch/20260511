@@ -1,90 +1,124 @@
 let capture;
 let faceMesh;
+let handPose;
 let faces = [];
-// 設定偵測參數：開啟細節點位辨識
-let options = { maxFaces: 1, refineLandmarks: true, flipHorizontal: false };
+let hands = [];
+let earringImages = [];
+let currentEarringIndex = 0; // 預設顯示第一款耳環
+
+// 偵測設定
+let faceOptions = { maxFaces: 1, refineLandmarks: true, flipHorizontal: false };
+let handOptions = { maxHands: 1, flipHorizontal: false };
 
 function preload() {
-  // 載入 FaceMesh 模型
-  faceMesh = ml5.faceMesh(options);
+  // 載入 FaceMesh 與 HandPose 模型
+  faceMesh = ml5.faceMesh(faceOptions);
+  handPose = ml5.handPose(handOptions);
+  
+  // 載入 5 款耳環圖片 (請確保資料夾 pic 內有這些檔案)
+  earringImages[0] = loadImage('pic/acc1_ring.png');
+  earringImages[1] = loadImage('pic/acc2_pearl.png');
+  earringImages[2] = loadImage('pic/acc3_tassel.png');
+  earringImages[3] = loadImage('pic/acc4_jade.png');
+  earringImages[4] = loadImage('pic/acc5_phoenix.png');
 }
 
 function setup() {
-  // 1. 建立全螢幕畫布
+  // 建立全螢幕畫布
   createCanvas(windowWidth, windowHeight);
-
-  // 2. 啟動攝影機，並加入錯誤處理
-  capture = createCapture(VIDEO, {
-    video: {
-      width: 640,
-      height: 480
-    },
-    audio: false
-  }, function(stream) {
-    console.log("攝影機啟動成功！");
-  });
-
+  
+  // 擷取攝影機影像
+  capture = createCapture(VIDEO);
   capture.size(640, 480);
-  capture.hide(); // 隱藏原始 HTML 影片元件
+  capture.hide(); 
 
-  // 3. 開始偵測臉部
+  // 開始偵測
   faceMesh.detectStart(capture, gotFaces);
+  handPose.detectStart(capture, gotHands);
 }
 
 function draw() {
-  // 設定背景顏色為 e7c6ff (粉紫色)
-  background('#e7c6ff');
+  background('#e7c6ff'); // 背景粉紫色
 
-  // 計算全螢幕 50% 的影像尺寸
   let vWidth = windowWidth * 0.5;
   let vHeight = windowHeight * 0.5;
-  
-  // 計算畫面中央位置
   let x = (width - vWidth) / 2;
   let y = (height - vHeight) / 2;
 
   push();
-  // --- 鏡像與位移邏輯 ---
-  // 先移到置中座標
+  // 置中並處理鏡像
   translate(x, y);
-  // 再移到該區域的右側並水平翻轉 (scale -1) 達到鏡像效果
   translate(vWidth, 0);
   scale(-1, 1);
 
-  // 繪製攝影機影像
+  // 繪製影像
   image(capture, 0, 0, vWidth, vHeight);
 
-  // --- 繪製耳垂黃色圓圈 ---
+  // --- 手勢辨識與切換邏輯 ---
+  if (hands.length > 0) {
+    let fingerCount = countFingers(hands[0]);
+    // 依手指數量 (1-5) 切換耳環
+    if (fingerCount >= 1 && fingerCount <= 5) {
+      currentEarringIndex = fingerCount - 1;
+    }
+  }
+
+  // --- 繪製耳垂上的耳環影像 ---
   if (faces.length > 0) {
     let face = faces[0];
     
-    // 選取最接近「耳垂」底部的特徵點
-    // 147: 右側耳垂點 (鏡像後顯示在左邊)
-    // 376: 左側耳垂點 (鏡像後顯示在右邊)
-    let earPoints = [face.keypoints[147], face.keypoints[376]];
+    // 選取臉頰兩側耳垂點：147 (右), 376 (左)
+    let keypoints = [face.keypoints[147], face.keypoints[376]];
 
-    fill(255, 255, 0); // 黃色
-    noStroke();
-
-    for (let pt of earPoints) {
+    imageMode(CENTER); 
+    for (let i = 0; i < keypoints.length; i++) {
+      let pt = keypoints[i];
       if (pt) {
-        // 關鍵：將偵測到的 640x480 座標映射到實際顯示的 vWidth x vHeight
-        let mx = map(pt.x, 0, capture.width, 0, vWidth);
-        let my = map(pt.y, 0, capture.height, 0, vHeight);
+        // 座標映射
+        let mappedX = map(pt.x, 0, capture.width, 0, vWidth);
+        let mappedY = map(pt.y, 0, capture.height, 0, vHeight);
         
-        // 畫出圓圈
-        circle(mx, my, 22); 
+        // 耳環大小設為影像寬度的 8%
+        let eSize = vWidth * 0.08;
+        
+        // 繪製目前的耳環圖片
+        image(earringImages[currentEarringIndex], mappedX, mappedY, eSize, eSize);
       }
     }
+    imageMode(CORNER); 
   }
   pop();
 }
 
+// 接收臉部偵測結果
 function gotFaces(results) {
   faces = results;
 }
 
+// 接收手部偵測結果
+function gotHands(results) {
+  hands = results;
+}
+
+// 計算手指數量的輔助函數
+function countFingers(hand) {
+  let count = 0;
+  // 檢查四隻手指 (食指到小指) 是否伸直
+  // 關鍵點索引：食指(8), 中指(12), 無名指(16), 小指(20)
+  // 若指尖 y 座標小於第二關節 y 座標，代表手指伸出
+  let tips = [8, 12, 16, 20];
+  for (let tip of tips) {
+    if (hand.keypoints[tip].y < hand.keypoints[tip - 2].y) {
+      count++;
+    }
+  }
+  // 拇指(4) 判斷邏輯較特殊（檢查 x 軸方向）
+  if (hand.keypoints[4].x < hand.keypoints[3].x) {
+    count++;
+  }
+  return count;
+}
+
 function windowResized() {
-  // 當視窗大小改變或平板轉向時，自動修正畫布尺寸
   resizeCanvas(windowWidth, windowHeight);
 }
