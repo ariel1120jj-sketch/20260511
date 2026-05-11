@@ -1,14 +1,26 @@
 let capture;
 let faceMesh;
+let handPose;
 let faces = [];
-let earringImg;
+let hands = [];
+let earringImages = [];
+let currentEarringIndex = 0; // 預設顯示第一款耳環
+
 // 偵測設定
-let options = { maxFaces: 1, refineLandmarks: true, flipHorizontal: false };
+let faceOptions = { maxFaces: 1, refineLandmarks: true, flipHorizontal: false };
+let handOptions = { maxHands: 1, flipHorizontal: false };
 
 function preload() {
-  // 載入 FaceMesh 模型
-  earringImg = loadImage('pic/acc1_ring.png');
-  faceMesh = ml5.faceMesh(options);
+  // 載入 FaceMesh 與 HandPose 模型
+  faceMesh = ml5.faceMesh(faceOptions);
+  handPose = ml5.handPose(handOptions);
+  
+  // 載入 5 款耳環圖片
+  earringImages[0] = loadImage('pic/acc1_ring.png');
+  earringImages[1] = loadImage('pic/acc2_pearl.png');
+  earringImages[2] = loadImage('pic/acc3_tassel.png');
+  earringImages[3] = loadImage('pic/acc4_jade.png');
+  earringImages[4] = loadImage('pic/acc5_phoenix.png');
 }
 
 function setup() {
@@ -22,6 +34,8 @@ function setup() {
 
   // 開始偵測臉部
   faceMesh.detectStart(capture, gotFaces);
+  // 開始偵測手部
+  handPose.detectStart(capture, gotHands);
 }
 
 function draw() {
@@ -46,6 +60,15 @@ function draw() {
 
   // 在翻轉後的座標系中繪製影像，影像本身會呈現鏡像效果
   image(capture, 0, 0, vWidth, vHeight);
+
+  // --- 手勢辨識與切換邏輯 ---
+  if (hands.length > 0) {
+    let fingerCount = countFingers(hands[0]);
+    // 如果手指數量在 1-5 之間，更新目前的耳環索引
+    if (fingerCount >= 1 && fingerCount <= 5) {
+      currentEarringIndex = fingerCount - 1;
+    }
+  }
 
   // --- 繪製耳垂上的耳環影像 ---
   if (faces.length > 0) {
