@@ -1,66 +1,81 @@
 let capture;
 let faceMesh;
 let faces = [];
+let options = { maxFaces: 1, refineLandmarks: false, flipHorizontal: false };
 
 function preload() {
-  // 載入 ml5.js 的 faceMesh 模型
-  faceMesh = ml5.faceMesh();
+  // 載入 FaceMesh 模型
+  faceMesh = ml5.faceMesh(options);
 }
 
 function setup() {
   // 建立全螢幕畫布
   createCanvas(windowWidth, windowHeight);
+
   // 擷取攝影機影像
   capture = createCapture(VIDEO);
   capture.size(640, 480);
-  // 隱藏預設的 HTML 影片元件，避免在畫布下方出現重複影像
   capture.hide();
 
-  // 開始對攝影機影像進行臉部偵測
-  faceMesh.detectStart(capture, (results) => {
-    faces = results;
-  });
+  // 開始偵測臉部
+  faceMesh.detectStart(capture, gotFaces);
 }
 
 function draw() {
-  // 設定背景顏色為 e7c6ff
+  // 背景設定為 e7c6ff (粉紫色)
   background('#e7c6ff');
 
-  // 計算顯示影像的寬高（視窗的 50%）
+  // 計算顯示影像的寬高（視窗寬高的 50%）
   let vWidth = windowWidth * 0.5;
   let vHeight = windowHeight * 0.5;
-  
+
   // 計算置中座標
   let x = (width - vWidth) / 2;
   let y = (height - vHeight) / 2;
 
   push();
-  // 實作左右顛倒：將座標移至目標區域的右側，然後水平翻轉
+  // --- 鏡像處理與置中 ---
+  // 先移動到顯示區域的中心，進行水平翻轉，再移回原點
   translate(x + vWidth, y);
   scale(-1, 1);
-  // 繪製影像，從翻轉後的原點開始繪製
+
+  // 繪製攝影機影像
   image(capture, 0, 0, vWidth, vHeight);
 
-  // 如果偵測到臉部，則繪製耳垂位置
+  // --- 繪製耳垂標記 ---
   if (faces.length > 0) {
     let face = faces[0];
-    // 取得左右耳垂附近的關鍵點 (234 為右耳區域, 454 為左耳區域)
-    let earPoints = [face.keypoints[234], face.keypoints[454]];
+    
+    // FaceMesh 特徵點索引：
+    // 左耳垂附近點位約為 132, 161 (依模型而定，此處選用邊緣參考點)
+    // 這裡選用常用的耳垂參考點：234 (右臉側), 454 (左臉側)
+    // 註：因為我們用了 scale(-1, 1)，畫布座標會自動對應鏡像
+    
+    let leftEar = face.keypoints[234];  // 左側參考點
+    let rightEar = face.keypoints[454]; // 右側參考點
 
-    fill(255, 255, 0); // 設定圓圈顏色為黃色
+    fill(255, 255, 0); // 黃色
     noStroke();
 
-    for (let pt of earPoints) {
-      // 將攝影機原始座標映射到畫布上的顯示大小 (50% 寬高)
-      let mappedX = map(pt.x, 0, capture.width, 0, vWidth);
-      let mappedY = map(pt.y, 0, capture.height, 0, vHeight);
-      circle(mappedX, mappedY, 15); // 在耳垂位置畫出黃色圓圈
-    }
+    // 映射座標：將原始影像座標映射到畫布縮放後的寬高
+    let lx = map(leftEar.x, 0, capture.width, 0, vWidth);
+    let ly = map(leftEar.y, 0, capture.height, 0, vHeight);
+    let rx = map(rightEar.x, 0, capture.width, 0, vWidth);
+    let ry = map(rightEar.y, 0, capture.height, 0, vHeight);
+
+    // 畫出耳垂位置的黃色圓圈
+    circle(lx, ly, 15);
+    circle(rx, ry, 15);
   }
   pop();
 }
 
+function gotFaces(results) {
+  // 更新偵測到的臉部數據
+  faces = results;
+}
+
 function windowResized() {
-  // 當視窗大小改變時，重新調整畫布大小以維持全螢幕
+  // 視窗縮放時重新調整畫布
   resizeCanvas(windowWidth, windowHeight);
 }
