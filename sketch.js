@@ -4,6 +4,7 @@ let handPose;
 let faces = [];
 let hands = [];
 let earringImages = [];
+let maskImages = [];
 let currentEarringIndex = 0; // 預設顯示第一款耳環
 
 // 偵測設定
@@ -21,6 +22,13 @@ function preload() {
   earringImages[2] = loadImage('pic/acc3_tassel.png');
   earringImages[3] = loadImage('pic/acc4_jade.png');
   earringImages[4] = loadImage('pic/acc5_phoenix.png');
+
+  // 載入 5 款面具圖片 (從 mask 資料夾)
+  maskImages[0] = loadImage('mask/mask1.png');
+  maskImages[1] = loadImage('mask/mask2.png');
+  maskImages[2] = loadImage('mask/mask3.png');
+  maskImages[3] = loadImage('mask/mask4.png');
+  maskImages[4] = loadImage('mask/mask5.png');
 }
 
 function setup() {
@@ -129,27 +137,28 @@ function countFingers(hand) {
 
 // 繪製面具的輔助函數
 function drawMask(face, vWidth, vHeight) {
-  push();
-  // 設定面具顏色：半透明金色
-  fill(255, 215, 0, 150); 
-  stroke(255, 255, 255, 200);
-  strokeWeight(2);
+  // 選取面具中心點 (168 為鼻樑中心)
+  let center = face.keypoints[168];
+  // 選取臉部邊緣點以計算面具寬度 (234 為右臉邊緣, 454 為左臉邊緣)
+  let leftEdge = face.keypoints[234];
+  let rightEdge = face.keypoints[454];
 
-  // 選取面具輪廓的特徵點索引 (橫跨額頭、太陽穴與鼻樑)
-  // 這些索引對應 FaceMesh 的特定臉部位置
-  let maskIndices = [21, 54, 103, 67, 109, 10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 168, 172, 58, 132, 93, 234, 127, 162];
+  if (center && leftEdge && rightEdge) {
+    // 座標映射
+    let mx = map(center.x, 0, capture.width, 0, vWidth);
+    let my = map(center.y, 0, capture.height, 0, vHeight);
+    
+    // 計算面具寬度：根據臉部兩側距離，稍微放大 (1.2倍) 以覆蓋臉部
+    let faceDist = dist(leftEdge.x, leftEdge.y, rightEdge.x, rightEdge.y);
+    let mWidth = map(faceDist, 0, capture.width, 0, vWidth) * 1.5;
+    let mHeight = mWidth * (maskImages[currentEarringIndex].height / maskImages[currentEarringIndex].width);
 
-  beginShape();
-  for (let index of maskIndices) {
-    let pt = face.keypoints[index];
-    if (pt) {
-      let mx = map(pt.x, 0, capture.width, 0, vWidth);
-      let my = map(pt.y, 0, capture.height, 0, vHeight);
-      vertex(mx, my);
-    }
+    push();
+    imageMode(CENTER);
+    // 繪製對應的手勢面具
+    image(maskImages[currentEarringIndex], mx, my, mWidth, mHeight);
+    pop();
   }
-  endShape(CLOSE);
-  pop();
 }
 
 function windowResized() {
