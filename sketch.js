@@ -15,7 +15,7 @@ function preload() {
   faceMesh = ml5.faceMesh(faceOptions);
   handPose = ml5.handPose(handOptions);
   
-  // 載入 5 款耳環圖片 (請確保資料夾 pic 內有這些檔案)
+  // 載入 5 款耳環圖片
   earringImages[0] = loadImage('pic/acc1_ring.png');
   earringImages[1] = loadImage('pic/acc2_pearl.png');
   earringImages[2] = loadImage('pic/acc3_tassel.png');
@@ -103,19 +103,24 @@ function gotHands(results) {
 // 計算手指數量的輔助函數
 function countFingers(hand) {
   let count = 0;
-  // 檢查四隻手指 (食指到小指) 是否伸直
-  // 關鍵點索引：食指(8), 中指(12), 無名指(16), 小指(20)
-  // 若指尖 y 座標小於第二關節 y 座標，代表手指伸出
-  let tips = [8, 12, 16, 20];
-  for (let tip of tips) {
-    if (hand.keypoints[tip].y < hand.keypoints[tip - 2].y) {
+
+  // 檢查四隻手指：食指(8), 中指(12), 無名指(16), 小指(20)
+  // 判斷指尖 (Tip) 是否高於指節 (Pip)
+  let fingerTips = [8, 12, 16, 20];
+  let fingerPips = [6, 10, 14, 18];
+  for (let i = 0; i < fingerTips.length; i++) {
+    if (hand.keypoints[fingerTips[i]].y < hand.keypoints[fingerPips[i]].y) {
       count++;
     }
   }
-  // 拇指(4) 判斷邏輯較特殊（檢查 x 軸方向）
-  if (hand.keypoints[4].x < hand.keypoints[3].x) {
+
+  // 拇指 (4)：判斷拇指尖與小指基部 (17) 的距離是否大於拇指第一指節 (3) 的距離
+  let dTip = dist(hand.keypoints[4].x, hand.keypoints[4].y, hand.keypoints[17].x, hand.keypoints[17].y);
+  let dJoint = dist(hand.keypoints[3].x, hand.keypoints[3].y, hand.keypoints[17].x, hand.keypoints[17].y);
+  if (dTip > dJoint) {
     count++;
   }
+
   return count;
 }
 
